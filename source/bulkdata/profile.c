@@ -331,10 +331,13 @@ static void* CollectAndReport(void* data)
     do
     {
         T2Info("%s while Loop -- START \n", __FUNCTION__);
+        // Release reuseThreadMutex before acquiring reportInProgressMutex to maintain lock order
+        pthread_mutex_unlock(&profile->reuseThreadMutex);
         pthread_mutex_lock(&profile->reportInProgressMutex);
         profile->reportInProgress = true;
         pthread_cond_signal(&profile->reportInProgressCond);
         pthread_mutex_unlock(&profile->reportInProgressMutex);
+        pthread_mutex_lock(&profile->reuseThreadMutex);
 
         int count = profile->grepSeekProfile->execCounter;
 
@@ -549,8 +552,18 @@ static void* CollectAndReport(void* data)
                     pthread_cond_init(&profile->reportcond, NULL);
                     clock_gettime(CLOCK_REALTIME, &profile->currentTime);
                     profile->maxlatencyTime.tv_sec = profile->currentTime.tv_sec;
-                    srand(time(0)); // Initialise the random number generator
-                    maxuploadinmilliSec = rand() % (profile->maxUploadLatency - 1);
+                    unsigned int random_value = 0;
+		    FILE *urandom = fopen("/dev/urandom", "r");
+		    if(urandom != NULL && fread(&random_value, sizeof(random_value), 1, urandom) == 1)
+		    {
+			maxuploadinmilliSec = random_value % (profile->maxUploadLatency - 1);
+			fclose(urandom);
+		    }
+		    else
+		    {
+			if(urandom != NULL) fclose(urandom);
+		        maxuploadinmilliSec = (unsigned int)(time(0) % (profile->maxUploadLatency - 1));
+		    }
                     maxuploadinSec =  (maxuploadinmilliSec + 1) / 1000;
                 }
                 if( strcmp(profile->protocol, "HTTP") == 0 || strcmp(profile->protocol, "RBUS_METHOD") == 0 )
@@ -564,7 +577,9 @@ static void* CollectAndReport(void* data)
                             pthread_mutex_lock(&profile->reportMutex);
                             T2Info("waiting for %ld sec of macUploadLatency\n", (long) maxuploadinSec);
                             profile->maxlatencyTime.tv_sec += maxuploadinSec;
-                            n = pthread_cond_timedwait(&profile->reportcond, &profile->reportMutex, &profile->maxlatencyTime);
+                            do {
+                                n = pthread_cond_timedwait(&profile->reportcond, &profile->reportMutex, &profile->maxlatencyTime);
+                            } while(n != ETIMEDOUT && n != 0);
                             if(n == ETIMEDOUT)
                             {
                                 T2Info("TIMEOUT for maxUploadLatency of profile %s\n", profile->name);
@@ -615,7 +630,9 @@ static void* CollectAndReport(void* data)
                             pthread_mutex_lock(&profile->reportMutex);
                             T2Info("waiting for %ld sec of macUploadLatency\n", (long) maxuploadinSec);
                             profile->maxlatencyTime.tv_sec += maxuploadinSec;
-                            n = pthread_cond_timedwait(&profile->reportcond, &profile->reportMutex, &profile->maxlatencyTime);
+                            do {
+                                n = pthread_cond_timedwait(&profile->reportcond, &profile->reportMutex, &profile->maxlatencyTime);
+                            } while(n != ETIMEDOUT && n != 0);
                             if(n == ETIMEDOUT)
                             {
                                 T2Info("TIMEOUT for maxUploadLatency of profile %s\n", profile->name);
@@ -782,9 +799,11 @@ reportThreadEnd :
     }
     while(profile->enable);
     T2Info("%s --out Exiting collect and report Thread\n", __FUNCTION__);
+    pthread_mutex_unlock(&profile->reuseThreadMutex);
     pthread_mutex_lock(&profile->reportInProgressMutex);
     profile->reportInProgress = false;
     pthread_mutex_unlock(&profile->reportInProgressMutex);
+    pthread_mutex_lock(&profile->reuseThreadMutex);
     profile->threadExists = false;
     pthread_mutex_unlock(&profile->reuseThreadMutex);
     pthread_mutex_destroy(&profile->reuseThreadMutex);

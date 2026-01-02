@@ -258,19 +258,25 @@ void* TimeoutThread(void *arg)
         if(tProfile->firstreportint > 0 && tProfile->firstexecution == true )
         {
             T2Info("Waiting for %d sec for next TIMEOUT for profile as firstreporting interval is given - %s\n", tProfile->firstreportint, tProfile->name);
-            n = pthread_cond_timedwait(&tProfile->tCond, &tProfile->tMutex, &_ts);
+            do {
+                n = pthread_cond_timedwait(&tProfile->tCond, &tProfile->tMutex, &_ts);
+            } while(n != ETIMEDOUT && n != 0);
         }
         else
         {
             if(tProfile->timeOutDuration == UINT_MAX && tProfile->timeRefinSec == 0)
             {
                 T2Info("Waiting for condition as reporting interval is not configured for profile - %s\n", tProfile->name);
-                n = pthread_cond_wait(&tProfile->tCond, &tProfile->tMutex);
+                do {
+                    n = pthread_cond_wait(&tProfile->tCond, &tProfile->tMutex);
+                } while(n != 0 && !tProfile->terminated);
             }
             else
             {
                 T2Info("Waiting for timeref or reporting interval for the profile - %s is started\n", tProfile->name);
-                n = pthread_cond_timedwait(&tProfile->tCond, &tProfile->tMutex, &_ts);
+                do {
+                    n = pthread_cond_timedwait(&tProfile->tCond, &tProfile->tMutex, &_ts);
+                } while(n != ETIMEDOUT && n != 0);
             }
         }
         if(n == ETIMEDOUT)
@@ -648,8 +654,20 @@ T2ERROR unregisterProfileFromScheduler(const char* profileName)
             // pthread_join(tProfile->tId, NULL); // pthread_detach in freeSchedulerProfile will detach the thread
             sched_yield(); // This will give chance for the signal receiving thread to start
             int count = 0;
-            while(signalrecived_and_executing && !is_activation_time_out)
+            bool signal_executing = true;
+            while(signal_executing && !is_activation_time_out)
             {
+                if(pthread_mutex_lock(&tProfile->tMutex) != 0)
+                {
+                    T2Error("tProfile Mutex lock failed\n");
+                    return T2ERROR_FAILURE;
+                }
+                signal_executing = signalrecived_and_executing;
+                if(pthread_mutex_unlock(&tProfile->tMutex) != 0)
+                {
+                    T2Error("tProfile Mutex unlock failed\n");
+                    return T2ERROR_FAILURE;
+                }
                 if(count++ > 10)
                 {
                     break;

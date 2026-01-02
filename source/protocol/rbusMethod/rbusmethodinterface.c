@@ -50,6 +50,7 @@ static void asyncMethodHandler(rbusHandle_t handle, char const* methodName, rbus
     (void) params;
 
     T2Info("T2 asyncMethodHandler called: %s with return error code  = %s \n", methodName, rbusError_ToString(retStatus));
+    pthread_mutex_lock(&rbusMethodMutex);
     if(retStatus == RBUS_ERROR_SUCCESS)
     {
         isRbusMethod = true ;
