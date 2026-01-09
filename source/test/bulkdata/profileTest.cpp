@@ -17,7 +17,7 @@
 #include "test/mocks/rdkconfigMock.h"
 #include "test/mocks/VectorMock.h"
 #include "test/bulkdata/SchedulerMock.h"
-#include "test/mocks/ProfileMock.h"
+#include "test/bulkdata/ProfileMock.h"
 using namespace std;
 
 using ::testing::_;
