@@ -17,6 +17,7 @@
 #include "test/mocks/rdkconfigMock.h"
 #include "test/mocks/VectorMock.h"
 #include "test/bulkdata/SchedulerMock.h"
+#include "test/mocks/ProfileMock.h"
 using namespace std;
 
 using ::testing::_;
@@ -48,6 +49,7 @@ rbusMock *g_rbusMock = NULL;
 rdkconfigMock *g_rdkconfigMock = nullptr;
 extern VectorMock *g_vectorMock;
 extern SchedulerMock *g_schedulerMock;
+
 
 class ProfileTest : public ::testing::Test {
 protected:
@@ -1082,6 +1084,8 @@ TEST(CollectAndReportTest, Covers_EMarkerList_WithRealEventMarkerStruct) {
 }
 TEST(CollectAndReportTest, Covers_jsonReportObj_nonNull_forPrepareAndDestroy) {
     g_vectorMock = nullptr; // Use real vectors
+    ProfileMock mock;
+    g_profileMock = &mock;
 
     CollectAndReportFunc fn = getCollectAndReportFunc();
 
@@ -1094,13 +1098,14 @@ TEST(CollectAndReportTest, Covers_jsonReportObj_nonNull_forPrepareAndDestroy) {
     profile.grepSeekProfile = &grepSeekProfile;
     profile.jsonEncoding = (JSONEncoding*)malloc(sizeof(JSONEncoding));
     profile.jsonEncoding->reportFormat = JSONRF_OBJHIERARCHY;
-    profile.triggerReportOnCondition = true;
+    profile.triggerReportOnCondition = false;
     // Add some non-null JSON object
     profile.jsonReportObj = cJSON_CreateObject();
+
     // Optionally add test data
     cJSON_AddStringToObject(profile.jsonReportObj, "key", "value");
     // Optionally add test data
-
+    EXPECT_CALL(mock, cJSON_PrintUnformatted(_)).WillOnce(::testing::Return(nullptr));
     pthread_mutex_init(&profile.triggerCondMutex, nullptr);
     pthread_cond_init(&profile.reuseThread, nullptr);
     pthread_mutex_init(&profile.reuseThreadMutex, nullptr);
@@ -1124,6 +1129,7 @@ TEST(CollectAndReportTest, Covers_jsonReportObj_nonNull_forPrepareAndDestroy) {
     pthread_mutex_destroy(&profile.reuseThreadMutex);
 
     free(profile.jsonEncoding);
+    g_profileMock = nullptr;
     // Don't free profile.jsonReportObj here (it is cleaned up by the function)
 }
 #endif
