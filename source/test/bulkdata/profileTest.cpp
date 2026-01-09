@@ -17,7 +17,7 @@
 #include "test/mocks/rdkconfigMock.h"
 #include "test/mocks/VectorMock.h"
 #include "test/bulkdata/SchedulerMock.h"
-
+#include "test/reportgen/
 using namespace std;
 
 using ::testing::_;
@@ -1095,11 +1095,12 @@ TEST(CollectAndReportTest, Covers_jsonReportObj_nonNull_forPrepareAndDestroy) {
     profile.grepSeekProfile = &grepSeekProfile;
     profile.jsonEncoding = (JSONEncoding*)malloc(sizeof(JSONEncoding));
     profile.jsonEncoding->reportFormat = JSONRF_OBJHIERARCHY;
-    profile.triggerReportOnCondition = false;
+    profile.triggerReportOnCondition = true;
     // Add some non-null JSON object
     profile.jsonReportObj = cJSON_CreateObject();
     // Optionally add test data
     cJSON_AddStringToObject(profile.jsonReportObj, "key", "value");
+    // Optionally add test data
 
     pthread_mutex_init(&profile.triggerCondMutex, nullptr);
     pthread_cond_init(&profile.reuseThread, nullptr);
