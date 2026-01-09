@@ -9,9 +9,7 @@ ProfileMock* g_profileMock = nullptr;
 
 extern "C" char* cJSON_PrintUnformatted(const cJSON* item)
 {
-    if (!g_profileMock)
-    {
-        return nullptr;
-    }
-    return g_profileMock->cJSON_PrintUnformatted(item);
+    if (g_profileMock)
+        return g_profileMock->cJSON_PrintUnformatted(item);
+    return nullptr;
 }
